@@ -1,0 +1,10 @@
+# log files
+*.log
+
+# Selenium webdriver
+geckodriver.exe
+
+# Pyinstaller build files
+*.spec
+build/
+dist/
