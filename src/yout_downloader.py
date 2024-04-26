@@ -137,10 +137,4 @@ def main():
                 logger.error(f"{datetime.datetime.now().strftime(time_format)}: 404")
 
 
-def get_tor_session():
-    session = requests.session()
-    session.proxies = {'http':  'socks5h://127.0.0.1:9051',
-                       'https': 'socks5h://127.0.0.1:9051'}
-    return session
-
 main()
