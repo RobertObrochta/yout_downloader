@@ -9,10 +9,8 @@ from selenium.webdriver.firefox.service import Service
 from selenium.webdriver.support import expected_conditions as EC
 from stem import Signal
 from stem.control import Controller
-import requests
 import time
 import yaml
-from yaml import load
 try:
     from yaml import CLoader as Loader
 except ImportError:
