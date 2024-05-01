@@ -15,30 +15,85 @@ try:
     from yaml import CLoader as Loader
 except ImportError:
     from yaml import Loader
+import json
+import re
+import requests
 
 time_format = '%Y-%m-%d %H:%M:%S'
 
-def read_links(setlist_file):
-    all_links = []
+def read_setlist(setlist_file):
+    '''Returns (track, artist, url)'''
+    song_data = []
     with open(setlist_file,'r') as file:
         for link in file:
-            all_links.append(link.strip())
-    return all_links
+            track_info_url_split = link.split("*")
+            track_info = track_info_url_split[0].strip()
+            track, artist = get_track_and_artist(track_info)
+            if len(track_info_url_split) > 1:
+                url = track_info_url_split[1].strip()
+                song_data.append((track, artist, url))
+            else:
+                print("missing data in setlist")
+    return song_data
 
 
-def download_from_yout(webdriver, logger, link):
+def get_yt_song_and_artist(youtube_url):
+    # big thanks for u/JoshIsMahName for this function
+    song_name = None
+    artist_name = None
+ 
+    r = requests.get(youtube_url)
+ 
+    raw_matches = re.findall('(\\{"metadataRowRenderer":.*?\\})(?=,{"metadataRowRenderer")', r.text)
+    json_objects = [json.loads(m) for m in raw_matches if '{"simpleText":"Song"}' in m or '{"simpleText":"Artist"}' in m] # [Song Data, Artist Data]
+ 
+    if len(json_objects) == 2:
+        song_contents = json_objects[0]["metadataRowRenderer"]["contents"][0]
+        artist_contents = json_objects[1]["metadataRowRenderer"]["contents"][0]
+ 
+        if "runs" in song_contents:
+            song_name = song_contents["runs"][0]["text"]
+        else:
+            song_name = song_contents["simpleText"]
+            
+        if "runs" in artist_contents:
+            artist_name = artist_contents["runs"][0]["text"]
+        else:
+            artist_name = artist_contents["simpleText"]
+ 
+    print(song_name, artist_name)
+    return song_name, artist_name
+
+
+def get_track_and_artist(track_info):
+    artist_track_split = track_info.split("-")
+    artist = artist_track_split[0].strip()
+    track = artist_track_split[1].strip()
+
+    return track, artist
+
+
+def download_from_yout(webdriver, logger, link, track, artist):
 
     logger.info(f"opening https://yout.com/video/?url={link}")
+    #song, artist = get_yt_song_and_artist(link)
     webdriver.get(f"https://yout.com/video/?url={link}")
 
     try:
         wait = WebDriverWait(webdriver, 600)
-        element = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, "button[class='btn btn-primary btn-block btn-yout btn-recorder']")))
-        element.click()
+        download_btn = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, "button[class='btn btn-primary btn-block btn-yout btn-recorder']")))
+        title_input = webdriver.find_element(By.NAME, "settings_title")
+        artist_input = webdriver.find_element(By.NAME, "settings_artist")
+        if len(track) > 0:
+            title_input.clear()
+            title_input.send_keys(track)
+
+        if len(artist) > 0:
+            artist_input.clear()
+            artist_input.send_keys(artist)
+        download_btn.click()
     except Exception as e:
         logger.error(e)
-
-    return datetime.datetime.now().strftime(time_format)
 
 
 def reset_circuit(logger):
@@ -91,18 +146,21 @@ def main():
         service = Service(executable_path=fr'{gecko_driver_path}')
         driver = webdriver.Firefox(service = service)
 
-        # get all links to download
-        all_links = read_links(setlist_path)
-        logger.info("setlist links:")
-        for link in all_links:
-            logger.info(f"\t{link}")
+        # get all song data for download
+        song_data = read_setlist(setlist_path)
+        logger.info("setlist links:") 
+        for data in song_data:
+            logger.info(f"\t{data[0], data[1], data[2]}")
 
         count = 1
         download_limit = 3
 
         # main file detector logic
-        for link_to_download in all_links:
+        for data in song_data:
             all_files = glob.glob(downloads_folder_path + "\\*.mp3")
+            track = data[0]
+            artist = data[1]
+            link_to_download = data[2]
 
             try:
                 if len(all_files) > 0:
@@ -110,13 +168,12 @@ def main():
                     latest_filename = all_files[0]
                     latest_mtime = datetime.datetime.fromtimestamp(os.path.getmtime(latest_filename)).strftime(time_format)
 
-                    download_from_yout(driver, logger, link_to_download)
+                    download_from_yout(driver, logger, link_to_download, track, artist)
 
                     # wait for .mp3 to completely download before looping again (occurs when part file no longer exists)
                     exists_part = False
                     while True:
                         part_files = glob.glob(downloads_folder_path + "\\*.part")
-                        print(len(part_files), exists_part)
                         if len(part_files) > 0:
                             exists_part = True
                         if exists_part and len(part_files) == 0:
