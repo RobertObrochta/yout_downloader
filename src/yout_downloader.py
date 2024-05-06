@@ -1,7 +1,10 @@
 import os
+import subprocess
 import datetime
 import glob
 import logging
+import keyboard
+import pygetwindow
 from selenium import webdriver
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.common.by import By
@@ -15,9 +18,6 @@ try:
     from yaml import CLoader as Loader
 except ImportError:
     from yaml import Loader
-import json
-import re
-import requests
 
 time_format = '%Y-%m-%d %H:%M:%S'
 
@@ -26,43 +26,13 @@ def read_setlist(setlist_file):
     song_data = []
     with open(setlist_file,'r') as file:
         for link in file:
-            track_info_url_split = link.split("*")
-            track_info = track_info_url_split[0].strip()
+            url_start_index = link.find("https://")
+            track_info = link[ : url_start_index].strip()
+            url = link[url_start_index : ].strip()
             track, artist = get_track_and_artist(track_info)
-            if len(track_info_url_split) > 1:
-                url = track_info_url_split[1].strip()
-                song_data.append((track, artist, url))
-            else:
-                print("missing data in setlist")
+            print(track, artist, url)
+            song_data.append((track, artist, url))
     return song_data
-
-
-def get_yt_song_and_artist(youtube_url):
-    # big thanks for u/JoshIsMahName for this function
-    song_name = None
-    artist_name = None
- 
-    r = requests.get(youtube_url)
- 
-    raw_matches = re.findall('(\\{"metadataRowRenderer":.*?\\})(?=,{"metadataRowRenderer")', r.text)
-    json_objects = [json.loads(m) for m in raw_matches if '{"simpleText":"Song"}' in m or '{"simpleText":"Artist"}' in m] # [Song Data, Artist Data]
- 
-    if len(json_objects) == 2:
-        song_contents = json_objects[0]["metadataRowRenderer"]["contents"][0]
-        artist_contents = json_objects[1]["metadataRowRenderer"]["contents"][0]
- 
-        if "runs" in song_contents:
-            song_name = song_contents["runs"][0]["text"]
-        else:
-            song_name = song_contents["simpleText"]
-            
-        if "runs" in artist_contents:
-            artist_name = artist_contents["runs"][0]["text"]
-        else:
-            artist_name = artist_contents["simpleText"]
- 
-    print(song_name, artist_name)
-    return song_name, artist_name
 
 
 def get_track_and_artist(track_info):
@@ -106,7 +76,28 @@ def reset_circuit(logger):
     except Exception as e:
         logger.error(e)
     time.sleep(5)
-    
+
+
+def reset_tor_circuit(logger):
+    # brings tor window to forefront and hits native rest circuit keybind
+    try:
+        '''
+        logger.info("\tresetting circuit")
+        tor_win = pygetwindow.getWindowsWithTitle('Tor')[0]
+        tor_win.activate()
+        time.sleep(2)
+        keyboard.send('ctrl+shift+l')
+
+        # refresh firefox window
+        yout_win = pygetwindow.getWindowsWithTitle('Firefox')[0]
+        print(yout_win)
+        yout_win.activate()
+        time.sleep(2)
+        keyboard.send('ctrl+r')
+        '''
+    except Exception as e:
+        logger.error(e)
+    time.sleep(5)
 
 def read_config(config_path):
     stream = open(config_path, 'r')
@@ -132,19 +123,24 @@ def main():
     
     if (os.path.isdir(fr'{downloads_folder_path}') and os.path.exists(fr'{setlist_path}')):
         # open tor
-        os.popen(fr'{tor_browser_path}')
+        p = subprocess.Popen(fr"{tor_browser_path}")
         tor_start_time = datetime.datetime.now().strftime(time_format)
         logger.info(f"{tor_start_time}: tor started")
 
         # selenium initialization
         profile = webdriver.FirefoxProfile(fr'{tor_profile_path}')
+        options = webdriver.FirefoxOptions()
+        #options.add_argument(f"download.default_directory={downloads_folder_path}")
+        profile.set_preference("browser.download.dir", downloads_folder_path)
+        profile.set_preference('profile', tor_profile_path)
         profile.set_preference('network.proxy.type', 1)
         profile.set_preference('network.proxy.socks', '127.0.0.1')
         profile.set_preference('network.proxy.socks_port', 9051)
         profile.set_preference("network.proxy.socks_remote_dns", False)
         profile.update_preferences()
+        options.profile = profile
         service = Service(executable_path=fr'{gecko_driver_path}')
-        driver = webdriver.Firefox(service = service)
+        driver = webdriver.Firefox(service = service, options=options)
 
         # get all song data for download
         song_data = read_setlist(setlist_path)
@@ -181,9 +177,13 @@ def main():
 
                     logger.info(f"\t{latest_mtime}: {latest_filename} download completed")
 
-                    if count == download_limit:
+                    if count == 1:
                         count = 1
-                        reset_circuit(logger)
+                        #reset_circuit(logger)
+                        #reset_tor_circuit(logger)
+                        p.terminate()
+                        time.sleep(10)
+                        p = subprocess.Popen(fr"{tor_browser_path}")
                     
                     else:
                         count += 1
