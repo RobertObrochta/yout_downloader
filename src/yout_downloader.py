@@ -62,16 +62,21 @@ def download_from_yout(webdriver, logger, link, track, artist):
         download_btn = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, "button[class='btn btn-primary btn-block btn-yout btn-recorder']")))
         title_input = webdriver.find_element(By.NAME, "settings_title")
         artist_input = webdriver.find_element(By.NAME, "settings_artist")
-        if len(track) > 0:
+    except Exception as e:
+        logger.error(e)
+        wait = WebDriverWait(webdriver, 5000)
+        download_btn = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, "button[class='btn btn-primary btn-block btn-yout btn-recorder']")))
+        title_input = webdriver.find_element(By.NAME, "settings_title")
+        artist_input = webdriver.find_element(By.NAME, "settings_artist")
+
+    if len(track) > 0:
             title_input.clear()
             title_input.send_keys(track)
 
-        if len(artist) > 0:
-            artist_input.clear()
-            artist_input.send_keys(artist)
-        download_btn.click()
-    except Exception as e:
-        logger.error(e)
+    if len(artist) > 0:
+        artist_input.clear()
+        artist_input.send_keys(artist)
+    download_btn.click()
 
 def reopen_tor(logger, driver, tor_process):
     # closes and reopens tor, webdriver
