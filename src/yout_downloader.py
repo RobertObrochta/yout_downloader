@@ -3,15 +3,11 @@ import subprocess
 import datetime
 import glob
 import logging
-import keyboard
-import pygetwindow
 from selenium import webdriver
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.common.by import By
 from selenium.webdriver.firefox.service import Service
 from selenium.webdriver.support import expected_conditions as EC
-from stem import Signal
-from stem.control import Controller
 import time
 import yaml
 try:
