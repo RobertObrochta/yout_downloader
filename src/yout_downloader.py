@@ -73,21 +73,9 @@ def download_from_yout(webdriver, logger, link, track, artist):
     except Exception as e:
         logger.error(e)
 
-
-def reset_circuit(logger):
-    # signal TOR for a new connection 
-    try:
-        logger.info("\tresetting circuit")
-        with Controller.from_port(port = 9050) as controller:
-            controller.authenticate()
-            controller.signal(Signal.NEWNYM)
-    except Exception as e:
-        logger.error(e)
-    time.sleep(5)
-
-
 def reopen_tor(logger, driver, tor_process):
-    # closes and reopens tor, webdriver 
+    # closes and reopens tor, webdriver
+    logger.info("resetting circuit")
     try:
         time.sleep(1.5)
         driver.close()
