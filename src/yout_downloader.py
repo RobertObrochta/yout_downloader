@@ -109,6 +109,7 @@ def main():
     tor_browser_path = configs['tor_browser_path']
     tor_profile_path = configs['tor_profile_path']
     gecko_driver_path = configs['gecko_driver_path']
+    download_limit = int(configs['download_limit'])
 
     logger.info("-----------------------------------------------------")
     logger.info(f"detecting downloads from {downloads_folder_path}")
@@ -141,7 +142,6 @@ def main():
             logger.info(f"\t{data[0], data[1], data[2]}")
 
         count = 1
-        download_limit = 3
 
         # main file detector logic
         for data in song_data:
