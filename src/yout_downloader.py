@@ -30,21 +30,29 @@ def read_setlist(setlist_file):
             track_info = link[ : url_start_index].strip()
             url = link[url_start_index : ].strip()
             track, artist = get_track_and_artist(track_info)
-            print(track, artist, url)
             song_data.append((track, artist, url))
     return song_data
 
 
 def get_track_and_artist(track_info):
-    artist_track_split = track_info.split("-")
-    artist = artist_track_split[0].strip()
-    track = artist_track_split[1].strip()
+    '''
+    Returns artist and track information with the format "Track Title - Artist" (or just assumes track name if no '-' is given)
+    '''
+    if track_info.find("-") != -1:
+        artist_track_split = track_info.split("-")
+        artist = artist_track_split[0].strip()
+        track = artist_track_split[1].strip()
+    else:
+        artist = ""
+        track = track_info
 
     return track, artist
 
 
 def download_from_yout(webdriver, logger, link, track, artist):
-
+    '''
+    Opens yout.com at the given link with the given track info, autofills, and downloads
+    '''
     logger.info(f"opening https://yout.com/video/?url={link}")
     #song, artist = get_yt_song_and_artist(link)
     webdriver.get(f"https://yout.com/video/?url={link}")
@@ -78,26 +86,18 @@ def reset_circuit(logger):
     time.sleep(5)
 
 
-def reset_tor_circuit(logger):
-    # brings tor window to forefront and hits native rest circuit keybind
+def reopen_tor(logger, driver, tor_process):
+    # closes and reopens tor, webdriver 
     try:
-        '''
-        logger.info("\tresetting circuit")
-        tor_win = pygetwindow.getWindowsWithTitle('Tor')[0]
-        tor_win.activate()
-        time.sleep(2)
-        keyboard.send('ctrl+shift+l')
-
-        # refresh firefox window
-        yout_win = pygetwindow.getWindowsWithTitle('Firefox')[0]
-        print(yout_win)
-        yout_win.activate()
-        time.sleep(2)
-        keyboard.send('ctrl+r')
-        '''
+        time.sleep(1.5)
+        driver.close()
+        time.sleep(1.5)
+        tor_process.terminate()
+        tor_process.kill()
+        time.sleep(1.5)
     except Exception as e:
         logger.error(e)
-    time.sleep(5)
+
 
 def read_config(config_path):
     stream = open(config_path, 'r')
@@ -130,7 +130,6 @@ def main():
         # selenium initialization
         profile = webdriver.FirefoxProfile(fr'{tor_profile_path}')
         options = webdriver.FirefoxOptions()
-        #options.add_argument(f"download.default_directory={downloads_folder_path}")
         profile.set_preference("browser.download.dir", downloads_folder_path)
         profile.set_preference('profile', tor_profile_path)
         profile.set_preference('network.proxy.type', 1)
@@ -157,7 +156,6 @@ def main():
             track = data[0]
             artist = data[1]
             link_to_download = data[2]
-
             try:
                 if len(all_files) > 0:
                     all_files.sort(key=os.path.getmtime, reverse=True)
@@ -177,13 +175,10 @@ def main():
 
                     logger.info(f"\t{latest_mtime}: {latest_filename} download completed")
 
-                    if count == 1:
+                    if count == download_limit:
                         count = 1
-                        #reset_circuit(logger)
-                        #reset_tor_circuit(logger)
-                        p.terminate()
-                        time.sleep(10)
-                        p = subprocess.Popen(fr"{tor_browser_path}")
+                        reopen_tor(logger, driver, p)
+                        driver = webdriver.Firefox(service = service, options=options)
                     
                     else:
                         count += 1
