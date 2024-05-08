@@ -12,3 +12,4 @@ Folders should not be named using ```.``` (or ```/``` or ```\``` for that matter
 
 ## Tasklist
 - [ ] refactor (all)
+- [ ] Add upper and lower limits to download_limit as 3 and 1 respectively
